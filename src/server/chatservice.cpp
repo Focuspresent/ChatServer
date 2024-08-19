@@ -102,9 +102,9 @@ void ChatService::login(const muduo::net::TcpConnectionPtr &conn,
             response["errno"] = 0;
             response["id"] = user.getId();
             response["username"] = user.getUsername();
-            response["offlinemessages"]=offlineMsgModel_.query(id);
+            response["offlinemessages"] = offlineMsgModel_.query(id);
 
-            //清除离线消息
+            // 清除离线消息
             offlineMsgModel_.erase(id);
         }
     }
@@ -156,6 +156,21 @@ void ChatService::p2pChat(const muduo::net::TcpConnectionPtr &conn,
                           muduo::Timestamp time)
 {
     int toid = js["to"].get<int>();
+
+    json response;
+    response["msgid"] = P2P_MSG_ACK;
+    // 用户不存在
+    User user = userModel_.query(toid);
+    if (user.getId() == -1)
+    {
+        response["errno"] = 1;
+        response["errmsg"] = "用户账号不存在";
+        conn->send(response.dump());
+        return;
+    }
+
+    // 用户存在
+    // 是否离线
     bool isoff = false;
 
     {
@@ -165,14 +180,25 @@ void ChatService::p2pChat(const muduo::net::TcpConnectionPtr &conn,
         {
             // toid 在线，由服务端转发消息
             it->second->send(js.dump());
-            return;
         }
-        isoff = true;
+        else
+        {
+            isoff = true;
+        }
     }
+
+    response["errno"]=0;
 
     if (isoff)
     {
         // toid 不在线，存储离线消息
-        offlineMsgModel_.insert(toid,js.dump());
+        offlineMsgModel_.insert(toid, js.dump());
+        response["errmsg"]="发送离线消息成功";
     }
+    else
+    {
+        response["errmsg"]="发送消息成功";
+    }
+
+    conn->send(response.dump());
 }
