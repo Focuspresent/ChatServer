@@ -17,7 +17,7 @@ public:
 
     bool connect();
     bool update(const std::string &sql);
-    bool transactionHandle(const std::vector<const char *> &sqls);
+    bool transactionHandle(std::vector<std::string> &sqls);
     MYSQL_RES *query(const std::string &sql);
     MYSQL *getConnection();
 

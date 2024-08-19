@@ -11,6 +11,7 @@
 #include "json.hpp"
 #include "usermodel.hpp"
 #include "offlinemsgmodel.hpp"
+#include "friendmodel.hpp"
 
 using MsgHandler = std::function<void(const muduo::net::TcpConnectionPtr &conn, nlohmann::json &js, muduo::Timestamp time)>;
 
@@ -30,7 +31,7 @@ public:
     MsgHandler getHandler(int msgid);
 
     // 客户端下线
-    void clientLogout(const muduo::net::TcpConnectionPtr& conn);
+    void clientLogout(const muduo::net::TcpConnectionPtr &conn);
 
 protected:
     // 登录业务
@@ -45,8 +46,18 @@ protected:
 
     // 点对点聊天业务
     void p2pChat(const muduo::net::TcpConnectionPtr &conn,
-               nlohmann::json &js,
-               muduo::Timestamp time);
+                 nlohmann::json &js,
+                 muduo::Timestamp time);
+
+    // 添加好友请求业务
+    void addFriendReq(const muduo::net::TcpConnectionPtr &conn,
+                      nlohmann::json &js,
+                      muduo::Timestamp time);
+
+    // 添加好友验证业务
+    void addFriendVerify(const muduo::net::TcpConnectionPtr &conn,
+                         nlohmann::json &js,
+                         muduo::Timestamp time);
 
 private:
     // 构造函数
@@ -57,13 +68,14 @@ private:
     ChatService(ChatService &&) = default;
     ChatService &operator=(ChatService &&) = default;
 
-    std::unordered_map<int, MsgHandler> msgHandlerMap_; ///< 存储回调函数
-    std::unordered_map<int,muduo::net::TcpConnectionPtr> userConnMap_; ///< 维护长连接
-    std::mutex mtx_; ///< 维护长连接表的线程安全锁
+    std::unordered_map<int, MsgHandler> msgHandlerMap_;                 ///< 存储回调函数
+    std::unordered_map<int, muduo::net::TcpConnectionPtr> userConnMap_; ///< 维护长连接
+    std::mutex mtx_;                                                    ///< 维护长连接表的线程安全锁
 
     // 数据库操作对象
-    UserModel userModel_; 
+    UserModel userModel_;
     OfflineMsgModel offlineMsgModel_;
+    FriendModel friendModel_;
 };
 
 #endif

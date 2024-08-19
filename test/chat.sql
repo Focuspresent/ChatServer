@@ -10,7 +10,7 @@ CREATE TABLE `users`(
 CREATE TABLE `friends`(
     `userid` INT NOT NULL COMMENT '用户id',
     `friendid` INT NOT NULL COMMENT '好友id',
-    `state` ENUM('pass','unpass','unclick') DEFAULT 'unclick' COMMENT '当前状态',
+    `state` ENUM('pass','unverify') DEFAULT 'unverify' COMMENT '当前状态',
     PRIMARY KEY (`userid`,`friendid`)
 )
 

@@ -16,6 +16,8 @@ ChatService::ChatService()
     msgHandlerMap_.emplace(LOGIN_MSG, bind(&ChatService::login, this, _1, _2, _3));
     msgHandlerMap_.emplace(REG_MSG, bind(&ChatService::reg, this, _1, _2, _3));
     msgHandlerMap_.emplace(P2P_CHAT_MSG, bind(&ChatService::p2pChat, this, _1, _2, _3));
+    msgHandlerMap_.emplace(ADD_FRIEND_REQ_MSG, bind(&ChatService::addFriendReq, this, _1, _2, _3));
+    msgHandlerMap_.emplace(ADD_FRIEND_VERIFY_MSG, bind(&ChatService::addFriendVerify, this, _1, _2, _3));
 }
 
 // 获取实例
@@ -102,11 +104,39 @@ void ChatService::login(const muduo::net::TcpConnectionPtr &conn,
             response["errno"] = 0;
             response["id"] = user.getId();
             response["username"] = user.getUsername();
-            response["offlinemessages"] = offlineMsgModel_.query(id);
-            response["sucmsg"] = "登录成功";
 
-            // 清除离线消息
-            offlineMsgModel_.erase(id);
+            // 离线消息
+            vector<string> vec_offlinemsg = offlineMsgModel_.query(id);
+            if (!vec_offlinemsg.empty())
+            {
+                response["offlinemessages"] = vec_offlinemsg;
+                // 清除离线消息
+                offlineMsgModel_.erase(id);
+            }
+
+            // 未确认的好友请求
+            vector<int> vec_fri_unv = friendModel_.queryUnverify(id);
+            if (!vec_fri_unv.empty())
+            {
+                response["friendunverifys"] = vec_fri_unv;
+            }
+
+            // 好友信息
+            vector<User> vec_fri = friendModel_.queryFriends(id);
+            if (!vec_fri.empty())
+            {
+                vector<string> vec;
+                for (auto &user : vec_fri)
+                {
+                    json js;
+                    js["id"] = user.getId();
+                    js["username"] = user.getUsername();
+                    js["state"] = user.getState();
+                    vec.emplace_back(js.dump());
+                }
+                response["friends"] = vec;
+            }
+            response["sucmsg"] = "登录成功";
         }
     }
     else
@@ -204,4 +234,116 @@ void ChatService::p2pChat(const muduo::net::TcpConnectionPtr &conn,
     }
 
     conn->send(response.dump());
+}
+
+// 添加好友请求业务
+void ChatService::addFriendReq(const muduo::net::TcpConnectionPtr &conn,
+                               nlohmann::json &js,
+                               muduo::Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    string username = js["from"].get<string>();
+    int friendid = js["to"].get<int>();
+
+    json response;
+    response["msgid"] = ADD_FRIEND_REQ_MSG_ACK;
+    // 用户不存在
+    User user = userModel_.query(friendid);
+    if (user.getId() == -1)
+    {
+        response["errno"] = 1;
+        response["errmsg"] = "用户账号不存在";
+        conn->send(response.dump());
+        return;
+    }
+
+    // 用户存在
+    // 新增一条(未确认)
+    friendModel_.insert(userid, friendid);
+    // 增加描述
+    js["desc"] = username + "请求跟你添加好友";
+
+    // 发送验证消息
+    // 是否离线
+    bool isoff = false;
+
+    {
+        unique_lock<mutex> lock(mtx_);
+        auto it = userConnMap_.find(friendid);
+        if (it != userConnMap_.end())
+        {
+            // friendid 在线
+            it->second->send(js.dump());
+        }
+        else
+        {
+            isoff = true;
+        }
+    }
+
+    if (isoff)
+    {
+        // friendid 不在线
+        offlineMsgModel_.insert(friendid, js.dump());
+    }
+
+    response["errno"] = 0;
+    response["sucmsg"] = "发送验证消息成功";
+    conn->send(response.dump());
+}
+
+// 添加好友验证业务
+void ChatService::addFriendVerify(const muduo::net::TcpConnectionPtr &conn,
+                                  nlohmann::json &js,
+                                  muduo::Timestamp time)
+{
+    int userid = js["to"].get<int>();
+    int friendid = js["id"].get<int>();
+    string friendname = js["from"].get<string>();
+    bool agree = js["agree"].get<bool>();
+
+    json res_user, res_fri;
+    res_user["msgid"] = ADD_FRIEND_VERIFY_MSG_ACK;
+    res_fri["msgid"] = ADD_FRIEND_VERIFY_MSG_ACK;
+    if (agree)
+    {
+        // 同意
+        res_user["desc"] = friendname + "通过你的好友请求";
+        // 更新数据库
+        friendModel_.pass(userid, friendid);
+    }
+    else
+    {
+        // 不同意
+        res_user["desc"] = friendname + "没有通过你的好友请求";
+        // 更新数据库
+        friendModel_.unpass(userid, friendid);
+    }
+    res_fri["desc"] = "成功处理好友请求";
+    // 回发客户端
+    conn->send(res_fri.dump());
+
+    // 发送给好友请求的客户
+    // 是否离线
+    bool isoff = false;
+
+    {
+        unique_lock<mutex> lock(mtx_);
+        auto it = userConnMap_.find(userid);
+        if (it != userConnMap_.end())
+        {
+            // userid 在线
+            it->second->send(res_user.dump());
+        }
+        else
+        {
+            isoff = true;
+        }
+    }
+
+    if (isoff)
+    {
+        // userid 不在线
+        offlineMsgModel_.insert(userid, res_user.dump());
+    }
 }

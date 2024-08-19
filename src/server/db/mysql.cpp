@@ -69,7 +69,7 @@ MYSQL_RES *Mysql::query(const std::string &sql)
  * @brief 事务处理
  * @param sqls 要处理的sql语句(除开启，提交，回滚)
  */
-bool Mysql::transactionHandle(const std::vector<const char *> &sqls)
+bool Mysql::transactionHandle(std::vector<std::string> &sqls)
 {
     // 开启事务
     if (mysql_query(conn_, "begin"))
@@ -81,7 +81,7 @@ bool Mysql::transactionHandle(const std::vector<const char *> &sqls)
     // 处理连续的sql语句
     for (auto it = sqls.begin(); it != sqls.end(); ++it)
     {
-        if (mysql_query(conn_, *it))
+        if (mysql_query(conn_, (*it).c_str()))
         {
             LOG_ERROR << "transaction error for: " << mysql_error(conn_);
             // 回滚事务
