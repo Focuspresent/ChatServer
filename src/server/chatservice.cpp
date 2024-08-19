@@ -103,6 +103,7 @@ void ChatService::login(const muduo::net::TcpConnectionPtr &conn,
             response["id"] = user.getId();
             response["username"] = user.getUsername();
             response["offlinemessages"] = offlineMsgModel_.query(id);
+            response["sucmsg"] = "登录成功";
 
             // 清除离线消息
             offlineMsgModel_.erase(id);
@@ -141,11 +142,13 @@ void ChatService::reg(const muduo::net::TcpConnectionPtr &conn,
         response["errno"] = 0;
         response["id"] = user.getId();
         response["username"] = user.getUsername();
+        response["sucmsg"] = "注册成功";
     }
     else
     {
         // 注册失败
         response["errno"] = 1;
+        response["errmsg"] = "注册失败";
     }
     conn->send(response.dump());
 }
@@ -187,17 +190,17 @@ void ChatService::p2pChat(const muduo::net::TcpConnectionPtr &conn,
         }
     }
 
-    response["errno"]=0;
+    response["errno"] = 0;
 
     if (isoff)
     {
         // toid 不在线，存储离线消息
         offlineMsgModel_.insert(toid, js.dump());
-        response["errmsg"]="发送离线消息成功";
+        response["sucmsg"] = "发送离线消息成功";
     }
     else
     {
-        response["errmsg"]="发送消息成功";
+        response["sucmsg"] = "发送消息成功";
     }
 
     conn->send(response.dump());
