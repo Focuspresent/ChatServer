@@ -65,6 +65,41 @@ MYSQL_RES *Mysql::query(const std::string &sql)
     return mysql_store_result(conn_);
 }
 
+/**
+ * @brief 事务处理
+ * @param sqls 要处理的sql语句(除开启，提交，回滚)
+ */
+bool Mysql::transactionHandle(const std::vector<const char *> &sqls)
+{
+    // 开启事务
+    if (mysql_query(conn_, "begin"))
+    {
+        LOG_ERROR << "transaction error for: " << mysql_error(conn_);
+        return false;
+    }
+
+    // 处理连续的sql语句
+    for (auto it = sqls.begin(); it != sqls.end(); ++it)
+    {
+        if (mysql_query(conn_, *it))
+        {
+            LOG_ERROR << "transaction error for: " << mysql_error(conn_);
+            // 回滚事务
+            mysql_query(conn_, "rollback");
+            return false;
+        }
+    }
+
+    // 提交事务
+    if (mysql_query(conn_, "commit"))
+    {
+        LOG_ERROR << "transaction error for: " << mysql_error(conn_);
+        return false;
+    }
+
+    return true;
+}
+
 MYSQL *Mysql::getConnection()
 {
     return conn_;

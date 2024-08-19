@@ -6,6 +6,14 @@ CREATE TABLE `users`(
     `state` ENUM('offline','online') DEFAULT 'offline' COMMENT '是否在线'
 );
 
+--创建好友表--
+CREATE TABLE `friends`(
+    `userid` INT NOT NULL COMMENT '用户id',
+    `friendid` INT NOT NULL COMMENT '好友id',
+    `state` ENUM('pass','unpass','unclick') DEFAULT 'unclick' COMMENT '当前状态',
+    PRIMARY KEY (`userid`,`friendid`)
+)
+
 --创建离线消息表--
 CREATE TABLE `offlinemessages`(
     `userid` INT NOT NULL COMMENT '用户id',

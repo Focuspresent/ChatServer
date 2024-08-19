@@ -15,7 +15,7 @@ ChatService::ChatService()
     // 增加回调函数
     msgHandlerMap_.emplace(LOGIN_MSG, bind(&ChatService::login, this, _1, _2, _3));
     msgHandlerMap_.emplace(REG_MSG, bind(&ChatService::reg, this, _1, _2, _3));
-    msgHandlerMap_.emplace(P2P_MSG, bind(&ChatService::p2pChat, this, _1, _2, _3));
+    msgHandlerMap_.emplace(P2P_CHAT_MSG, bind(&ChatService::p2pChat, this, _1, _2, _3));
 }
 
 // 获取实例
@@ -161,7 +161,7 @@ void ChatService::p2pChat(const muduo::net::TcpConnectionPtr &conn,
     int toid = js["to"].get<int>();
 
     json response;
-    response["msgid"] = P2P_MSG_ACK;
+    response["msgid"] = P2P_CHAT_MSG_ACK;
     // 用户不存在
     User user = userModel_.query(toid);
     if (user.getId() == -1)
