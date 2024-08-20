@@ -57,7 +57,7 @@ public:
         return state_;
     }
 
-private:
+protected:
     int id_;
     std::string username_;
     std::string password_;

@@ -18,6 +18,9 @@ ChatService::ChatService()
     msgHandlerMap_.emplace(P2P_CHAT_MSG, bind(&ChatService::p2pChat, this, _1, _2, _3));
     msgHandlerMap_.emplace(ADD_FRIEND_REQ_MSG, bind(&ChatService::addFriendReq, this, _1, _2, _3));
     msgHandlerMap_.emplace(ADD_FRIEND_VERIFY_MSG, bind(&ChatService::addFriendVerify, this, _1, _2, _3));
+    msgHandlerMap_.emplace(CREATE_GROUP_MSG, bind(&ChatService::createGroup, this, _1, _2, _3));
+    msgHandlerMap_.emplace(ADD_GROUP_MSG, bind(&ChatService::addGroup, this, _1, _2, _3));
+    msgHandlerMap_.emplace(GROUP_CHAR_MSG, bind(&ChatService::groupChat, this, _1, _2, _3));
 }
 
 // 获取实例
@@ -119,6 +122,22 @@ void ChatService::login(const muduo::net::TcpConnectionPtr &conn,
             if (!vec_fri_unv.empty())
             {
                 response["friendunverifys"] = vec_fri_unv;
+            }
+
+            // 已经添加的群组
+            vector<Group> vec_gro = groupModel_.queryGroups(id);
+            if (!vec_gro.empty())
+            {
+                vector<string> vec;
+                for (auto &group : vec_gro)
+                {
+                    json js;
+                    js["groupid"] = group.getId();
+                    js["groupname"] = group.getGroupname();
+                    js["groupdesc"] = group.getGroupdesc();
+                    vec.emplace_back(js.dump());
+                }
+                response["groups"] = vec;
             }
 
             // 好友信息
@@ -345,5 +364,110 @@ void ChatService::addFriendVerify(const muduo::net::TcpConnectionPtr &conn,
     {
         // userid 不在线
         offlineMsgModel_.insert(userid, res_user.dump());
+    }
+}
+
+// 创建群组业务
+void ChatService::createGroup(const muduo::net::TcpConnectionPtr &conn,
+                              nlohmann::json &js,
+                              muduo::Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    string groupname = js["groupname"].get<string>();
+    string groupdesc = js["groupdesc"].get<string>();
+
+    Group group(-1, groupname, groupdesc);
+
+    json response;
+    response["msgid"] = CREATE_GROUP_MSG_ACK;
+    if (groupModel_.createGroup(group))
+    {
+        // 创建群组成功
+        int groupid = group.getId();
+        // 更新数据库
+        groupModel_.addGroup(groupid, userid, "owner");
+
+        response["groupid"] = groupid;
+        response["errno"] = 0;
+        response["sucmsg"] = "创建群组成功";
+    }
+    else
+    {
+        // 创建群组失败
+        response["errno"] = 1;
+        response["errmsg"] = "创建群组失败";
+    }
+    conn->send(response.dump());
+}
+
+// 添加群组业务
+void ChatService::addGroup(const muduo::net::TcpConnectionPtr &conn,
+                           nlohmann::json &js,
+                           muduo::Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+
+    json response;
+    response["msgid"] = ADD_GROUP_MSG_ACK;
+
+    Group group = groupModel_.queryGroup(groupid);
+    if (group.getId() == -1)
+    {
+        response["errno"] = 1;
+        response["errmsg"] = "群组不存在";
+        conn->send(response.dump());
+        return;
+    }
+
+    // 更新数据库
+    if (!groupModel_.addGroup(groupid, userid))
+    {
+        response["errno"] = 2;
+        response["errmsg"] = "添加群组失败";
+        conn->send(response.dump());
+        return;
+    }
+
+    response["errno"] = 0;
+    response["sucmsg"] = "添加群组" + group.getGroupname() + "成功";
+    conn->send(response.dump());
+}
+
+// 群组聊天业务
+void ChatService::groupChat(const muduo::net::TcpConnectionPtr &conn,
+                            nlohmann::json &js,
+                            muduo::Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+
+    vector<GroupUser> groupusers = groupModel_.queryGroupUsers(groupid, userid);
+
+    if (!groupusers.empty())
+    {
+        // 发送群聊消息
+        for (auto &groupuser : groupusers)
+        {
+            int toid = groupuser.getId();
+            // 是否离线
+            bool isoff = false;
+            {
+                unique_lock<mutex> lock(mtx_);
+                auto it = userConnMap_.find(toid);
+                if (it != userConnMap_.end())
+                {
+                    it->second->send(js.dump());
+                }
+                else
+                {
+                    isoff = true;
+                }
+            }
+            if (isoff)
+            {
+                offlineMsgModel_.insert(toid, js.dump());
+            }
+        }
     }
 }

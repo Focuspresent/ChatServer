@@ -12,6 +12,7 @@
 #include "usermodel.hpp"
 #include "offlinemsgmodel.hpp"
 #include "friendmodel.hpp"
+#include "groupmodel.hpp"
 
 using MsgHandler = std::function<void(const muduo::net::TcpConnectionPtr &conn, nlohmann::json &js, muduo::Timestamp time)>;
 
@@ -59,6 +60,21 @@ protected:
                          nlohmann::json &js,
                          muduo::Timestamp time);
 
+    // 创建群组业务
+    void createGroup(const muduo::net::TcpConnectionPtr &conn,
+                         nlohmann::json &js,
+                         muduo::Timestamp time);
+    
+    // 添加群组业务
+    void addGroup(const muduo::net::TcpConnectionPtr &conn,
+                         nlohmann::json &js,
+                         muduo::Timestamp time);
+
+    // 群组聊天业务
+    void groupChat(const muduo::net::TcpConnectionPtr &conn,
+                         nlohmann::json &js,
+                         muduo::Timestamp time);
+
 private:
     // 构造函数
     ChatService();
@@ -76,6 +92,7 @@ private:
     UserModel userModel_;
     OfflineMsgModel offlineMsgModel_;
     FriendModel friendModel_;
+    GroupModel groupModel_;
 };
 
 #endif

@@ -17,6 +17,12 @@ enum MsgType
     ADD_FRIEND_REQ_MSG_ACK=8, //添加好友请求响应消息
     ADD_FRIEND_VERIFY_MSG=9, //添加好友验证消息
     ADD_FRIEND_VERIFY_MSG_ACK=10, //添加好友验证响应消息
+
+    CREATE_GROUP_MSG=11, //创建群组消息
+    CREATE_GROUP_MSG_ACK=12, //创建群组响应消息
+    ADD_GROUP_MSG=13, //添加群组消息
+    ADD_GROUP_MSG_ACK=14, //添加群组响应消息
+    GROUP_CHAR_MSG=15, //群组聊天消息
 };
 
 #endif
