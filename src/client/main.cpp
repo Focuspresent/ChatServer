@@ -11,6 +11,7 @@ int main(int argc, char *argv[])
     }
 
     ChatClient client(argv[1],atoi(argv[2]));
+    client.init();
     client.start();
 
     return 0;

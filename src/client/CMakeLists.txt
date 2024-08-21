@@ -11,6 +11,7 @@ target_include_directories(ChatClient PRIVATE ${PROJECT_SOURCE_DIR}/thirdparty/j
 
 target_include_directories(ChatClient PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_include_directories(ChatClient PRIVATE ${PROJECT_SOURCE_DIR}/include/client)
+target_include_directories(ChatClient PRIVATE ${PROJECT_SOURCE_DIR}/include/server/model)
 
 # 链接库
 target_link_libraries(ChatClient pthread)

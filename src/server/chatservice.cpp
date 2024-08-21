@@ -80,7 +80,7 @@ void ChatService::login(const muduo::net::TcpConnectionPtr &conn,
 
     User user = userModel_.query(id);
     json response;
-    response["msgid"] = REG_MSG_ACK;
+    response["msgid"] = LOGIN_MSG_ACK;
     if (user.getId() != -1 && user.getPassword() == password)
     {
         // 账号，密码验证成功
