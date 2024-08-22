@@ -22,7 +22,7 @@ enum MsgType
     CREATE_GROUP_MSG_ACK=12, //创建群组响应消息
     ADD_GROUP_MSG=13, //添加群组消息
     ADD_GROUP_MSG_ACK=14, //添加群组响应消息
-    GROUP_CHAR_MSG=15, //群组聊天消息
+    GROUP_CHAT_MSG=15, //群组聊天消息
 };
 
 #endif

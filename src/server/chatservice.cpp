@@ -20,7 +20,7 @@ ChatService::ChatService()
     msgHandlerMap_.emplace(ADD_FRIEND_VERIFY_MSG, bind(&ChatService::addFriendVerify, this, _1, _2, _3));
     msgHandlerMap_.emplace(CREATE_GROUP_MSG, bind(&ChatService::createGroup, this, _1, _2, _3));
     msgHandlerMap_.emplace(ADD_GROUP_MSG, bind(&ChatService::addGroup, this, _1, _2, _3));
-    msgHandlerMap_.emplace(GROUP_CHAR_MSG, bind(&ChatService::groupChat, this, _1, _2, _3));
+    msgHandlerMap_.emplace(GROUP_CHAT_MSG, bind(&ChatService::groupChat, this, _1, _2, _3));
 }
 
 // 获取实例
