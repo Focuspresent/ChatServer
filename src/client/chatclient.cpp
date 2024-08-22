@@ -60,6 +60,7 @@ void ChatClient::init()
     msgRecvHandlerMap_.emplace(CREATE_GROUP_MSG_ACK, bind(&ChatClient::creategroupackRecv, this, _1));
     msgRecvHandlerMap_.emplace(ADD_GROUP_MSG_ACK, bind(&ChatClient::addgroupackRecv, this, _1));
     msgRecvHandlerMap_.emplace(GROUP_CHAT_MSG, bind(&ChatClient::groupchatRecv, this, _1));
+    msgRecvHandlerMap_.emplace(REFRESH_MSG_ACK, bind(&ChatClient::refreshackRecv, this, _1));
 
     commandMap_.emplace("help", "显示支持的命令");
     commandMap_.emplace("show", "显示当前登录的用户信息");
@@ -70,6 +71,7 @@ void ChatClient::init()
     commandMap_.emplace("creategroup", "创建群组creategroup:groupname:groupdesc");
     commandMap_.emplace("addgroup", "添加群组addgroup:groupid");
     commandMap_.emplace("groupchat", "群组聊天groupchat:groupid:msg");
+    commandMap_.emplace("refresh", "刷新信息refresh");
 
     commandHandlerMap_.emplace("help", bind(&ChatClient::help, this, _1));
     commandHandlerMap_.emplace("show", bind(&ChatClient::show, this, _1));
@@ -80,6 +82,7 @@ void ChatClient::init()
     commandHandlerMap_.emplace("creategroup", bind(&ChatClient::creategroup, this, _1));
     commandHandlerMap_.emplace("addgroup", bind(&ChatClient::addgroup, this, _1));
     commandHandlerMap_.emplace("groupchat", bind(&ChatClient::groupchat, this, _1));
+    commandHandlerMap_.emplace("refresh", bind(&ChatClient::refresh, this, _1));
 }
 
 // 连接函数
@@ -395,7 +398,7 @@ void ChatClient::creategroup(const std::string &str)
 void ChatClient::addgroup(const std::string &str)
 {
     json js;
-    js["msgid"]=ADD_GROUP_MSG;
+    js["msgid"] = ADD_GROUP_MSG;
     js["id"] = user.getId();
     js["groupid"] = stoi(str);
 
@@ -413,12 +416,12 @@ void ChatClient::groupchat(const std::string &str)
     if (it != string::npos)
     {
         json js;
-        js["msgid"]=GROUP_CHAT_MSG;
-        js["id"]=user.getId();
-        js["from"]=user.getUsername();
-        js["groupid"]=stoi(str.substr(0,it));
-        js["msg"]=str.substr(it+1);
-        js["time"]=getCurrentTime();
+        js["msgid"] = GROUP_CHAT_MSG;
+        js["id"] = user.getId();
+        js["from"] = user.getUsername();
+        js["groupid"] = stoi(str.substr(0, it));
+        js["msg"] = str.substr(it + 1);
+        js["time"] = getCurrentTime();
 
         string s = js.dump();
 
@@ -427,6 +430,24 @@ void ChatClient::groupchat(const std::string &str)
             cerr << "groupchat send fail" << endl;
         }
     }
+}
+
+void ChatClient::refresh(const std::string &str)
+{
+    json js;
+    js["msgid"] = REFRESH_MSG;
+    js["id"] = user.getId();
+
+    string s = js.dump();
+
+    if (-1 == send(fd, s.c_str(), s.size() + 1, 0))
+    {
+        cerr << "refresn send fail" << endl;
+    }
+
+    // 等待响应
+    cout<<"wait ..."<<endl;
+    sem.wait();
 }
 
 // =======================================
@@ -438,13 +459,13 @@ void ChatClient::loginRecv(nlohmann::json &js)
     {
         user.setId(js["id"].get<int>());
         user.setUsername(js["username"].get<string>());
-        if(!js["friendunverifys"].is_null())
+        if (!js["friendunverifys"].is_null())
         {
-            vector<int> vec=js["friendunverifys"].get<vector<int>>();
+            vector<int> vec = js["friendunverifys"].get<vector<int>>();
             cout << "******好友请求******" << endl;
-            for(auto& id: vec)
+            for (auto &id : vec)
             {
-                cout<<"Id: "<<id<<endl;
+                cout << "Id: " << id << endl;
             }
         }
         if (!js["friends"].is_null())
@@ -573,14 +594,47 @@ void ChatClient::addgroupackRecv(nlohmann::json &js)
     }
 }
 
-void ChatClient::groupchatRecv(nlohmann::json& js)
+void ChatClient::groupchatRecv(nlohmann::json &js)
 {
-    int id=js["id"].get<int>();
-    string from=js["from"].get<string>();
-    int groupid=js["groupid"].get<int>();
-    string time=js["time"].get<string>();
-    string msg=js["msg"].get<string>();
-    cout<<"Groupid: "<<groupid<<endl;
-    cout<<"Time: "<<time<<" From: "<<from<<" Id: "<<id<<endl;
-    cout<<"Said: "<<msg<<endl;
+    int id = js["id"].get<int>();
+    string from = js["from"].get<string>();
+    int groupid = js["groupid"].get<int>();
+    string time = js["time"].get<string>();
+    string msg = js["msg"].get<string>();
+    cout << "Groupid: " << groupid << endl;
+    cout << "Time: " << time << " From: " << from << " Id: " << id << endl;
+    cout << "Said: " << msg << endl;
+}
+
+void ChatClient::refreshackRecv(nlohmann::json &js)
+{
+    if(!js["user"].is_null())
+    {
+        json j=json::parse(js["user"].get<string>());
+        user.setUsername(j["username"].get<string>());
+        user.setState(j["state"].get<string>());
+    }
+    if (!js["friends"].is_null())
+    {
+        friends.clear();
+        vector<string> vec = js["friends"].get<vector<string>>();
+        for (auto &str : vec)
+        {
+            json j = json::parse(str);
+            friends.emplace_back(j["id"].get<int>(), j["username"].get<string>(), "******", j["state"].get<string>());
+        }
+    }
+    if (!js["groups"].is_null())
+    {
+        groups.clear();
+        vector<string> vec = js["groups"].get<vector<string>>();
+        for (auto &str : vec)
+        {
+            json j = json::parse(str);
+            groups.emplace_back(j["groupid"].get<int>(), j["groupname"].get<string>(), j["groupdesc"].get<string>());
+        }
+    }
+
+    //通知
+    sem.post();
 }
