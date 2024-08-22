@@ -23,6 +23,9 @@ enum MsgType
     ADD_GROUP_MSG=13, //添加群组消息
     ADD_GROUP_MSG_ACK=14, //添加群组响应消息
     GROUP_CHAT_MSG=15, //群组聊天消息
+
+    REFRESH_MSG=16, //刷新消息
+    REFRESH_MSG_ACK=17, //刷新响应消息
 };
 
 #endif

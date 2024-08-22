@@ -75,6 +75,11 @@ protected:
                          nlohmann::json &js,
                          muduo::Timestamp time);
 
+    // 刷新业务
+    void refresh(const muduo::net::TcpConnectionPtr &conn,
+                         nlohmann::json &js,
+                         muduo::Timestamp time);
+
 private:
     // 构造函数
     ChatService();

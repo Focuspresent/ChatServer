@@ -21,6 +21,7 @@ ChatService::ChatService()
     msgHandlerMap_.emplace(CREATE_GROUP_MSG, bind(&ChatService::createGroup, this, _1, _2, _3));
     msgHandlerMap_.emplace(ADD_GROUP_MSG, bind(&ChatService::addGroup, this, _1, _2, _3));
     msgHandlerMap_.emplace(GROUP_CHAT_MSG, bind(&ChatService::groupChat, this, _1, _2, _3));
+    msgHandlerMap_.emplace(REFRESH_MSG, bind(&ChatService::refresh, this, _1, _2, _3));
 }
 
 // 获取实例
@@ -430,7 +431,7 @@ void ChatService::addGroup(const muduo::net::TcpConnectionPtr &conn,
     }
 
     response["errno"] = 0;
-    response["desc"] = "添加群组[" +to_string(groupid)+"]"+ group.getGroupname() + "成功";
+    response["desc"] = "添加群组[" + to_string(groupid) + "]" + group.getGroupname() + "成功";
     conn->send(response.dump());
 }
 
@@ -470,4 +471,58 @@ void ChatService::groupChat(const muduo::net::TcpConnectionPtr &conn,
             }
         }
     }
+}
+
+// 刷新业务
+void ChatService::refresh(const muduo::net::TcpConnectionPtr &conn,
+                          nlohmann::json &js,
+                          muduo::Timestamp time)
+{
+    int id = js["id"].get<int>();
+
+    json response;
+    response["msgid"] = REFRESH_MSG_ACK;
+    // 当前用户信息
+    User user=userModel_.query(id);
+    if(user.getId()!=-1)
+    {
+        json js;
+        js["username"]=user.getUsername();
+        js["state"]=user.getState();
+        response["user"]=js.dump();
+    }
+
+    // 已经添加的群组
+    vector<Group> vec_gro = groupModel_.queryGroups(id);
+    if (!vec_gro.empty())
+    {
+        vector<string> vec;
+        for (auto &group : vec_gro)
+        {
+            json js;
+            js["groupid"] = group.getId();
+            js["groupname"] = group.getGroupname();
+            js["groupdesc"] = group.getGroupdesc();
+            vec.emplace_back(js.dump());
+        }
+        response["groups"] = vec;
+    }
+
+    // 好友信息
+    vector<User> vec_fri = friendModel_.queryFriends(id);
+    if (!vec_fri.empty())
+    {
+        vector<string> vec;
+        for (auto &user : vec_fri)
+        {
+            json js;
+            js["id"] = user.getId();
+            js["username"] = user.getUsername();
+            js["state"] = user.getState();
+            vec.emplace_back(js.dump());
+        }
+        response["friends"] = vec;
+    }
+
+    conn->send(response.dump());
 }
