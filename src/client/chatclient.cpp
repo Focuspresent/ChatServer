@@ -1,5 +1,8 @@
 #include <iostream>
 #include <thread>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -14,7 +17,53 @@ using namespace std;
 using namespace std::placeholders;
 using json = nlohmann::json;
 
+// 获取当前时间
+std::string getCurrentTime()
+{
+    auto now = chrono::system_clock::now();
+    time_t now_c = chrono::system_clock::to_time_t(now);
+
+    stringstream ss;
+
+    ss << put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S");
+
+    return ss.str();
+}
+
+// ============================================
+// ChatClient类实现
 ChatClient::ChatClient(const std::string &ip, u_int16_t port)
+{
+    this->ip = ip;
+    this->port = port;
+    Connect();
+
+    // 接受线程启动
+    thread t(&ChatClient::Recv, this);
+    t.detach();
+}
+
+ChatClient::~ChatClient()
+{
+    close(fd);
+}
+
+void ChatClient::init()
+{
+    msgRecvHandlerMap_.emplace(LOGIN_MSG_ACK, bind(&ChatClient::loginRecv, this, _1));
+    msgRecvHandlerMap_.emplace(REG_MSG_ACK, bind(&ChatClient::regRecv, this, _1));
+
+    commandMap_.emplace("help", "显示支持的命令");
+    commandMap_.emplace("show", "显示当前登录的用户信息");
+    commandMap_.emplace("logout", "退出登录");
+
+    commandHandlerMap_.emplace("help", bind(&ChatClient::help, this, _1));
+    commandHandlerMap_.emplace("show", bind(&ChatClient::show, this, _1));
+    commandHandlerMap_.emplace("logout", bind(&ChatClient::logout, this, _1));
+}
+
+// 连接函数
+void ChatClient::Connect()
 {
     // 创建套接字
     fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -40,20 +89,10 @@ ChatClient::ChatClient(const std::string &ip, u_int16_t port)
     }
 }
 
-ChatClient::~ChatClient()
-{
-    close(fd);
-}
-
-void ChatClient::init()
-{
-    msgRecvHandlerMap_.emplace(LOGIN_MSG_ACK, bind(&ChatClient::loginRecv, this, _1));
-    msgRecvHandlerMap_.emplace(REG_MSG_ACK, bind(&ChatClient::regRecv, this, _1));
-}
-
 // 接受线程执行的函数
 void ChatClient::Recv()
 {
+    // cout<<"Recv Start"<<endl;
     for (;;)
     {
         char buf[1024] = {0};
@@ -78,33 +117,32 @@ void ChatClient::Recv()
 void ChatClient::mainMenu()
 {
     cout << "******主界面******" << endl;
-    if(!friends.empty())
-    {
-        cout << "******好友列表******" << endl;
-        for(auto& user: friends)
-        {
-            cout<<user.getId()<<" "<<user.getUsername()<<" "<<user.getState()<<endl;
-        }
-    }
-    if(!friends.empty())
-    {
-        cout << "******群组列表******" << endl;
-        for(auto& group: groups)
-        {
-            cout<<group.getId()<<" "<<group.getGroupname()<<" "<<group.getGroupdesc()<<endl;
-        }
-    }
+    help();
     for (;;)
     {
+        string line;
+        getline(cin, line);
+        auto it = line.find(":");
+        if (it == string::npos)
+        {
+            // 无参的命令
+            auto handler = commandHandlerMap_.find(line);
+            if (handler == commandHandlerMap_.end())
+            {
+                cerr << "没有相关函数" << endl;
+                continue;
+            }
+            handler->second("");
+        }
+        else
+        {
+            // 需要参数的命令
+        }
     }
 }
 
 void ChatClient::start()
-{
-    // 接受线程启动
-    thread t(&ChatClient::Recv, this);
-    t.detach();
-
+{       
     for (;;)
     {
         cout << "*****************************" << endl;
@@ -197,6 +235,47 @@ void ChatClient::start()
     }
 }
 
+// =======================================
+// 命令函数
+void ChatClient::help(const std::string &str)
+{
+    cout << "******命令列表******" << endl;
+    for (auto it = commandMap_.begin(); it != commandMap_.end(); ++it)
+    {
+        cout << it->first << ":" << it->second << endl;
+    }
+}
+
+void ChatClient::show(const std::string &str)
+{
+    cout << "******当前用户******" << endl;
+    cout << user.getId() << " " << user.getUsername() << endl;
+    if (!friends.empty())
+    {
+        cout << "******好友列表******" << endl;
+        for (auto &user : friends)
+        {
+            cout << user.getId() << " " << user.getUsername() << " " << user.getState() << endl;
+        }
+    }
+    if (!friends.empty())
+    {
+        cout << "******群组列表******" << endl;
+        for (auto &group : groups)
+        {
+            cout << group.getId() << " " << group.getGroupname() << " " << group.getGroupdesc() << endl;
+        }
+    }
+}
+
+void ChatClient::logout(const std::string &str)
+{
+    close(fd);
+    exit(0);
+}
+
+// =======================================
+// 消息接受回调
 void ChatClient::loginRecv(nlohmann::json &js)
 {
     int err = js["errno"].get<int>();
@@ -204,23 +283,23 @@ void ChatClient::loginRecv(nlohmann::json &js)
     {
         user.setId(js["id"].get<int>());
         user.setUsername(js["username"].get<string>());
-        if(!js["friends"].is_null())
-        {   
-            vector<string> vec=js["friends"].get<vector<string>>();
-            for(auto& str: vec)
+        if (!js["friends"].is_null())
+        {
+            vector<string> vec = js["friends"].get<vector<string>>();
+            for (auto &str : vec)
             {
-                json j=json::parse(str);
-                friends.emplace_back(j["id"].get<int>(),j["username"].get<string>(),"******",j["state"].get<string>());
+                json j = json::parse(str);
+                friends.emplace_back(j["id"].get<int>(), j["username"].get<string>(), "******", j["state"].get<string>());
             }
         }
-        if(!js["groups"].is_null())
+        if (!js["groups"].is_null())
         {
 
-            vector<string> vec=js["groups"].get<vector<string>>();
-            for(auto& str: vec)
+            vector<string> vec = js["groups"].get<vector<string>>();
+            for (auto &str : vec)
             {
-                json j=json::parse(str);
-                groups.emplace_back(j["groupid"].get<int>(),j["groupname"].get<string>(),j["groupdesc"].get<string>());
+                json j = json::parse(str);
+                groups.emplace_back(j["groupid"].get<int>(), j["groupname"].get<string>(), j["groupdesc"].get<string>());
             }
         }
         cout << "登录成功" << endl;

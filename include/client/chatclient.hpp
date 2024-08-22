@@ -5,12 +5,16 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <atomic>
 
 #include "user.hpp"
 #include "semaphore.hpp"
 #include "group.hpp"
 #include "common.hpp"
 #include "json.hpp"
+
+// 获取当前时间
+std::string getCurrentTime();
 
 /**
  * @brief 客户端类
@@ -26,6 +30,9 @@ public:
     void start();
 
 protected:
+    // 连接函数
+    void Connect();
+
     // 接受线程执行的函数
     void Recv();
 
@@ -36,7 +43,15 @@ protected:
     void loginRecv(nlohmann::json& js);
     void regRecv(nlohmann::json& js);
 
+    // 命令函数
+    void help(const std::string& str="");
+    void show(const std::string& str="");
+    void logout(const std::string& str="");
+
 private:
+    std::string ip; ///< 服务器地址
+    u_int16_t port; ///< 服务器端口
+
     int fd;                    ///< 套接字
     User user;                 ///< 当前登录的用户信息
     std::vector<User> friends; ///< 好友信息
@@ -51,8 +66,10 @@ private:
     std::unordered_map<int,std::function<void(nlohmann::json& js)>> msgRecvHandlerMap_;
 
     // 命令显示
+    std::unordered_map<std::string,std::string> commandMap_;
 
     // 命令发送回调
+    std::unordered_map<std::string,std::function<void(const std::string&)>> commandHandlerMap_;
 };
 
 #endif
