@@ -43,12 +43,18 @@ protected:
     void loginRecv(nlohmann::json& js);
     void regRecv(nlohmann::json& js);
     void chatRecv(nlohmann::json& js);
+    void chatackRecv(nlohmann::json& js);
+    void addfriendRecv(nlohmann::json& js);
+    void addfriendackRecv(nlohmann::json& js);
+    void verifyfriendackRecv(nlohmann::json& js);
 
     // 命令函数
     void help(const std::string& str="");
     void show(const std::string& str="");
     void logout(const std::string& str="");
     void chat(const std::string& str);
+    void addfriend(const std::string& str);
+    void verifyfriend(const std::string& str);
 
 private:
     std::string ip; ///< 服务器地址

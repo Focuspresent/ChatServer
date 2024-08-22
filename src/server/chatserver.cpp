@@ -19,6 +19,8 @@ ChatServer::ChatServer(muduo::net::EventLoop *loop,
     server_.setConnectionCallback(bind(&ChatServer::onConnection, this, _1));
 
     server_.setMessageCallback(bind(&ChatServer::onMessage, this, _1, _2, _3));
+
+    server_.setThreadNum(4);
 }
 
 void ChatServer::start()

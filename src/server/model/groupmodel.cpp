@@ -17,7 +17,7 @@ bool GroupModel::createGroup(Group &group)
     Mysql mysql;
     if (mysql.connect())
     {
-        if(mysql.update(sql))
+        if (mysql.update(sql))
         {
             group.setId(mysql_insert_id(mysql.getConnection()));
             return true;
@@ -49,23 +49,27 @@ bool GroupModel::addGroup(int groupid, int userid, const std::string &role)
 Group GroupModel::queryGroup(int groupid)
 {
     // 格式化
-    char sql[1024]={0};
-    sprintf(sql,"select groupname,groupdesc from `groups` where id=%d",groupid);
+    char sql[1024] = {0};
+    sprintf(sql, "select groupname,groupdesc from `groups` where id=%d", groupid);
 
     // 操作数据库
     Mysql mysql;
-    if(mysql.connect())
+    if (mysql.connect())
     {
-        MYSQL_RES* res=mysql.query(sql);
-        if(res!=nullptr)
+        MYSQL_RES *res = mysql.query(sql);
+        if (res != nullptr)
         {
-            MYSQL_ROW row=mysql_fetch_row(res);
+            MYSQL_ROW row = mysql_fetch_row(res);
+            if (nullptr != row)
+            {
+                // 释放资源
+                mysql_free_result(res);
 
-            // 释放资源
-            mysql_free_result(res);
-
-            return Group(groupid,row[0],row[1]);
+                return Group(groupid, row[0], row[1]);
+            }
         }
+        // 释放资源
+        mysql_free_result(res);
     }
 
     return Group();
@@ -78,7 +82,7 @@ std::vector<Group> GroupModel::queryGroups(int userid)
 
     // 格式化sql语句
     char sql[1024] = {0};
-    sprintf(sql, "select a.id,a.groupname,a.groupdesc from `groups` a inner join groupusers b on a.id=b.groupid where b.userid=%d",userid);
+    sprintf(sql, "select a.id,a.groupname,a.groupdesc from `groups` a inner join groupusers b on a.id=b.groupid where b.userid=%d", userid);
 
     // 操作数据库
     Mysql mysql;
@@ -110,16 +114,17 @@ std::vector<GroupUser> GroupModel::queryGroupUsers(int groupid, int userid)
 
     // 操作数据库
     Mysql mysql;
-    if(mysql.connect())
+    if (mysql.connect())
     {
-        MYSQL_RES* res=mysql.query(sql);
-        if(res!=nullptr)
+        MYSQL_RES *res = mysql.query(sql);
+        if (res != nullptr)
         {
             MYSQL_ROW row;
-            while(nullptr!=(row=mysql_fetch_row(res)))
+            while (nullptr != (row = mysql_fetch_row(res)))
             {
-                if(atoi(row[0])==userid) continue;
-                vec.emplace_back(atoi(row[0]),row[1],"*****",row[2],row[3]);
+                if (atoi(row[0]) == userid)
+                    continue;
+                vec.emplace_back(atoi(row[0]), row[1], "*****", row[2], row[3]);
             }
             // 释放资源
             mysql_free_result(res);

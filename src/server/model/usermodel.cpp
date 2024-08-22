@@ -42,14 +42,19 @@ User UserModel::query(int id)
         if (res != nullptr)
         {
             MYSQL_ROW row = mysql_fetch_row(res);
-            User user;
-            user.setId(atoi(row[0]));
-            user.setUsername(row[1]);
-            user.setPassword(row[2]);
-            user.setState(row[3]);
+            if (nullptr != row)
+            {
+                User user;
+                user.setId(atoi(row[0]));
+                user.setUsername(row[1]);
+                user.setPassword(row[2]);
+                user.setState(row[3]);
+                // 释放资源
+                mysql_free_result(res);
+                return user;
+            }
             // 释放资源
             mysql_free_result(res);
-            return user;
         }
     }
 
@@ -58,7 +63,7 @@ User UserModel::query(int id)
 }
 
 // 更新用户在线状态
-bool UserModel::updateState(User& user)
+bool UserModel::updateState(User &user)
 {
     // 格式化sql语句
     char sql[1024] = {0};
@@ -76,14 +81,15 @@ bool UserModel::updateState(User& user)
 }
 
 // 更新全体用户在线状态
-bool UserModel::updateAllState(const std::string& state)
+bool UserModel::updateAllState(const std::string &state)
 {
     // 格式化sql语句
-    char sql[1024]={0};
-    sprintf(sql,"update users set state='%s'",state.c_str());
+    char sql[1024] = {0};
+    sprintf(sql, "update users set state='%s'", state.c_str());
 
     Mysql mysql;
-    if(mysql.connect()){
+    if (mysql.connect())
+    {
         return mysql.update(sql);
     }
 

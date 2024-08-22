@@ -327,14 +327,14 @@ void ChatService::addFriendVerify(const muduo::net::TcpConnectionPtr &conn,
     if (agree)
     {
         // 同意
-        res_user["desc"] = friendname + "通过你的好友请求";
+        res_user["desc"] = friendid + " " + friendname + "通过你的好友请求";
         // 更新数据库
         friendModel_.pass(userid, friendid);
     }
     else
     {
         // 不同意
-        res_user["desc"] = friendname + "没有通过你的好友请求";
+        res_user["desc"] = friendid + " " + friendname + "没有通过你的好友请求";
         // 更新数据库
         friendModel_.unpass(userid, friendid);
     }
