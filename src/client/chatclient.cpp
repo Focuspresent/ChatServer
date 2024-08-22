@@ -57,6 +57,8 @@ void ChatClient::init()
     msgRecvHandlerMap_.emplace(ADD_FRIEND_REQ_MSG, bind(&ChatClient::addfriendRecv, this, _1));
     msgRecvHandlerMap_.emplace(ADD_FRIEND_REQ_MSG_ACK, bind(&ChatClient::addfriendackRecv, this, _1));
     msgRecvHandlerMap_.emplace(ADD_FRIEND_VERIFY_MSG_ACK, bind(&ChatClient::verifyfriendackRecv, this, _1));
+    msgRecvHandlerMap_.emplace(CREATE_GROUP_MSG_ACK,bind(&ChatClient::creategroupackRecv,this,_1));
+    msgRecvHandlerMap_.emplace(ADD_GROUP_MSG_ACK,bind(&ChatClient::addgroupackRecv,this,_1));
 
     commandMap_.emplace("help", "显示支持的命令");
     commandMap_.emplace("show", "显示当前登录的用户信息");
@@ -64,6 +66,8 @@ void ChatClient::init()
     commandMap_.emplace("chat", "点对点聊天chat:to:msg");
     commandMap_.emplace("addfriend", "发送添加好友请求addfriend:to");
     commandMap_.emplace("verifyfriend", "验证好友请求verifyfriend:to:[y/n]");
+    commandMap_.emplace("creategroup","创建群组creategroup:groupname:groupdesc");
+    commandMap_.emplace("addgroup","添加群组addgroup:groupid");
 
     commandHandlerMap_.emplace("help", bind(&ChatClient::help, this, _1));
     commandHandlerMap_.emplace("show", bind(&ChatClient::show, this, _1));
@@ -71,6 +75,8 @@ void ChatClient::init()
     commandHandlerMap_.emplace("chat", bind(&ChatClient::chat, this, _1));
     commandHandlerMap_.emplace("addfriend", bind(&ChatClient::addfriend, this, _1));
     commandHandlerMap_.emplace("verifyfriend", bind(&ChatClient::verifyfriend, this, _1));
+    commandHandlerMap_.emplace("creategroup",bind(&ChatClient::creategroup,this,_1));
+    commandHandlerMap_.emplace("addgroup",bind(&ChatClient::addgroup,this,_1));
 }
 
 // 连接函数
@@ -363,6 +369,40 @@ void ChatClient::verifyfriend(const std::string &str)
     }
 }
 
+void ChatClient::creategroup(const std::string& str)
+{
+    auto it=str.find(":");
+    if(it!=string::npos)
+    {
+        json js;
+        js["msgid"]=CREATE_GROUP_MSG;
+        js["id"]=user.getId();
+        js["groupname"]=str.substr(0,it);
+        js["groupdesc"]=str.substr(it+1);
+
+        string s=js.dump();
+
+        if(-1==send(fd,s.c_str(),s.size()+1,0))
+        {
+            cerr<<"creategroup send fail"<<endl;
+        }
+    }
+}
+
+void ChatClient::addgroup(const std::string& str)
+{
+    json js;
+    js["id"]=user.getId();
+    js["groupid"]=stoi(str);
+
+    string s=js.dump();
+
+    if(-1==send(fd,s.c_str(),s.size()+1,0))
+    {
+        cerr<<"addgroup send fail"<<endl;
+    }
+}
+
 // =======================================
 // 消息接受回调
 void ChatClient::loginRecv(nlohmann::json &js)
@@ -470,4 +510,29 @@ void ChatClient::addfriendackRecv(nlohmann::json &js)
 void ChatClient::verifyfriendackRecv(nlohmann::json &js)
 {
     cout << js["desc"].get<string>() << endl;
+}
+
+void ChatClient::creategroupackRecv(nlohmann::json& js)
+{
+    int err=js["errno"].get<int>();
+    if(!err)
+    {
+        cout<<"创建群组["<<js["groupid"].get<int>()<<"]"<<endl;
+    }
+    else
+    {
+        cerr << js["errmsg"].get<string>() << endl;
+    }
+}
+
+void ChatClient::addgroupackRecv(nlohmann::json& js)
+{
+    int err=js["errno"].get<int>();
+    if(!err)
+    {
+        cout<<js["desc"].get<string>()<<endl;
+    }
+    else{
+        cerr<<js["errmsg"].get<string>()<<endl;
+    }
 }

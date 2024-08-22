@@ -430,7 +430,7 @@ void ChatService::addGroup(const muduo::net::TcpConnectionPtr &conn,
     }
 
     response["errno"] = 0;
-    response["sucmsg"] = "添加群组" + group.getGroupname() + "成功";
+    response["desc"] = "添加群组[" +to_string(groupid)+"]"+ group.getGroupname() + "成功";
     conn->send(response.dump());
 }
 

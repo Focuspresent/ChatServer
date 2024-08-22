@@ -47,6 +47,8 @@ protected:
     void addfriendRecv(nlohmann::json& js);
     void addfriendackRecv(nlohmann::json& js);
     void verifyfriendackRecv(nlohmann::json& js);
+    void creategroupackRecv(nlohmann::json& js);
+    void addgroupackRecv(nlohmann::json& js);
 
     // 命令函数
     void help(const std::string& str="");
@@ -55,6 +57,8 @@ protected:
     void chat(const std::string& str);
     void addfriend(const std::string& str);
     void verifyfriend(const std::string& str);
+    void creategroup(const std::string& str);
+    void addgroup(const std::string& str);
 
 private:
     std::string ip; ///< 服务器地址
