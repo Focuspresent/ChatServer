@@ -52,14 +52,17 @@ void ChatClient::init()
 {
     msgRecvHandlerMap_.emplace(LOGIN_MSG_ACK, bind(&ChatClient::loginRecv, this, _1));
     msgRecvHandlerMap_.emplace(REG_MSG_ACK, bind(&ChatClient::regRecv, this, _1));
+    msgRecvHandlerMap_.emplace(P2P_CHAT_MSG,bind(&ChatClient::chatRecv,this,_1));
 
     commandMap_.emplace("help", "显示支持的命令");
     commandMap_.emplace("show", "显示当前登录的用户信息");
     commandMap_.emplace("logout", "退出登录");
+    commandMap_.emplace("chat","点对点聊天chat:to:msg");
 
     commandHandlerMap_.emplace("help", bind(&ChatClient::help, this, _1));
     commandHandlerMap_.emplace("show", bind(&ChatClient::show, this, _1));
     commandHandlerMap_.emplace("logout", bind(&ChatClient::logout, this, _1));
+    commandHandlerMap_.emplace("chat",bind(&ChatClient::chat,this,_1));
 }
 
 // 连接函数
@@ -137,6 +140,13 @@ void ChatClient::mainMenu()
         else
         {
             // 需要参数的命令
+            auto handler = commandHandlerMap_.find(line.substr(0,it));
+            if (handler == commandHandlerMap_.end())
+            {
+                cerr << "没有相关函数" << endl;
+                continue;
+            }
+            handler->second(line.substr(it+1));
         }
     }
 }
@@ -274,6 +284,29 @@ void ChatClient::logout(const std::string &str)
     exit(0);
 }
 
+void ChatClient::chat(const std::string& str)
+{
+    auto it=str.find(":");
+    if(it!=string::npos)
+    {
+        json js;
+        js["msgid"]=P2P_CHAT_MSG;
+        js["id"]=user.getId();
+        js["from"]=user.getUsername();
+        js["to"]=stoi(str.substr(0,it));
+        js["msg"]=str.substr(it+1);
+        js["time"]=getCurrentTime();
+
+        string s=js.dump();
+
+        if(-1==send(fd,s.c_str(),s.size()+1,0))
+        {
+            cerr<<"chat send fail"<<endl;
+        }
+
+    }
+}
+
 // =======================================
 // 消息接受回调
 void ChatClient::loginRecv(nlohmann::json &js)
@@ -302,6 +335,19 @@ void ChatClient::loginRecv(nlohmann::json &js)
                 groups.emplace_back(j["groupid"].get<int>(), j["groupname"].get<string>(), j["groupdesc"].get<string>());
             }
         }
+        if(!js["offlinemessages"].is_null())
+        {
+            vector<string> vec=js["offlinemessages"].get<vector<string>>();
+            for(auto& str: vec)
+            {
+                json j=json::parse(str);
+                auto it=msgRecvHandlerMap_.find(j["msgid"].get<int>());
+                if(it!=msgRecvHandlerMap_.end())
+                {
+                    it->second(j);
+                }
+            }
+        }
         cout << "登录成功" << endl;
         checkLogin = true;
     }
@@ -325,4 +371,14 @@ void ChatClient::regRecv(nlohmann::json &js)
         cerr << js["errmsg"].get<string>() << endl;
     }
     sem.post();
+}
+
+void ChatClient::chatRecv(nlohmann::json& js)
+{
+    int id=js["id"].get<int>();
+    string time=js["time"].get<string>();
+    string from=js["from"].get<string>();
+    string msg=js["msg"].get<string>();
+    cout<<"Time: "<<time<<" From: "<<from<<" Id: "<<id<<endl;
+    cout<<"Said: "<<msg<<endl;
 }

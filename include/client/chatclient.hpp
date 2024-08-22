@@ -42,11 +42,13 @@ protected:
     // 接受消息的回调函数
     void loginRecv(nlohmann::json& js);
     void regRecv(nlohmann::json& js);
+    void chatRecv(nlohmann::json& js);
 
     // 命令函数
     void help(const std::string& str="");
     void show(const std::string& str="");
     void logout(const std::string& str="");
+    void chat(const std::string& str);
 
 private:
     std::string ip; ///< 服务器地址
