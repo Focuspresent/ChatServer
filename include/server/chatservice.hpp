@@ -13,6 +13,7 @@
 #include "offlinemsgmodel.hpp"
 #include "friendmodel.hpp"
 #include "groupmodel.hpp"
+#include "redis.hpp"
 
 using MsgHandler = std::function<void(const muduo::net::TcpConnectionPtr &conn, nlohmann::json &js, muduo::Timestamp time)>;
 
@@ -98,6 +99,7 @@ private:
     OfflineMsgModel offlineMsgModel_;
     FriendModel friendModel_;
     GroupModel groupModel_;
+    Redis redis_;
 };
 
 #endif

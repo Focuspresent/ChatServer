@@ -22,6 +22,21 @@ ChatService::ChatService()
     msgHandlerMap_.emplace(ADD_GROUP_MSG, bind(&ChatService::addGroup, this, _1, _2, _3));
     msgHandlerMap_.emplace(GROUP_CHAT_MSG, bind(&ChatService::groupChat, this, _1, _2, _3));
     msgHandlerMap_.emplace(REFRESH_MSG, bind(&ChatService::refresh, this, _1, _2, _3));
+
+    // redis
+    if (redis_.connect())
+    {
+        redis_.setsubCallBack([this](int userid,const std::string& msg){
+            unique_lock<mutex> lock(mtx_);
+            auto it=userConnMap_.find(userid);
+            if(it!=userConnMap_.end())
+            {
+                it->second->send(msg);
+                return ;
+            }
+            offlineMsgModel_.insert(userid,msg);
+        });
+    }
 }
 
 // 获取实例
@@ -65,6 +80,7 @@ void ChatService::clientLogout(const muduo::net::TcpConnectionPtr &conn)
 
     if (user.getId() != -1)
     {
+        redis_.unsubscribe(user.getId()); ///< 取消订阅
         user.setState("offline");
         userModel_.updateState(user);
     }
@@ -99,6 +115,9 @@ void ChatService::login(const muduo::net::TcpConnectionPtr &conn,
                 unique_lock<mutex> lock(mtx_);
                 userConnMap_.emplace(id, conn);
             }
+
+            // 订阅频道
+            redis_.subscribe(id);
 
             // 更新在线状态
             user.setState("online");
@@ -223,35 +242,16 @@ void ChatService::p2pChat(const muduo::net::TcpConnectionPtr &conn,
     }
 
     // 用户存在
-    // 是否离线
-    bool isoff = false;
-
+    if (user.getState() == "online")
     {
-        unique_lock<mutex> lock(mtx_);
-        auto it = userConnMap_.find(toid);
-        if (it != userConnMap_.end())
-        {
-            // toid 在线，由服务端转发消息
-            it->second->send(js.dump());
-        }
-        else
-        {
-            isoff = true;
-        }
-    }
-
-    response["errno"] = 0;
-
-    if (isoff)
-    {
-        // toid 不在线，存储离线消息
-        offlineMsgModel_.insert(toid, js.dump());
-        response["sucmsg"] = "发送离线消息成功";
+        redis_.publish(toid, js.dump());
     }
     else
     {
-        response["sucmsg"] = "发送消息成功";
+        offlineMsgModel_.insert(toid, js.dump());
     }
+
+    response["errno"] = 0;
 
     conn->send(response.dump());
 }
@@ -284,26 +284,12 @@ void ChatService::addFriendReq(const muduo::net::TcpConnectionPtr &conn,
     js["desc"] = username + "请求跟你添加好友";
 
     // 发送验证消息
-    // 是否离线
-    bool isoff = false;
-
+    if (user.getState() == "online")
     {
-        unique_lock<mutex> lock(mtx_);
-        auto it = userConnMap_.find(friendid);
-        if (it != userConnMap_.end())
-        {
-            // friendid 在线
-            it->second->send(js.dump());
-        }
-        else
-        {
-            isoff = true;
-        }
+        redis_.publish(friendid, js.dump());
     }
-
-    if (isoff)
+    else
     {
-        // friendid 不在线
         offlineMsgModel_.insert(friendid, js.dump());
     }
 
@@ -344,26 +330,13 @@ void ChatService::addFriendVerify(const muduo::net::TcpConnectionPtr &conn,
     conn->send(res_fri.dump());
 
     // 发送给好友请求的客户
-    // 是否离线
-    bool isoff = false;
-
+    User user=userModel_.query(userid);
+    if(user.getState()=="online")
     {
-        unique_lock<mutex> lock(mtx_);
-        auto it = userConnMap_.find(userid);
-        if (it != userConnMap_.end())
-        {
-            // userid 在线
-            it->second->send(res_user.dump());
-        }
-        else
-        {
-            isoff = true;
-        }
+        redis_.publish(userid,res_user.dump());
     }
-
-    if (isoff)
+    else
     {
-        // userid 不在线
         offlineMsgModel_.insert(userid, res_user.dump());
     }
 }
@@ -451,21 +424,11 @@ void ChatService::groupChat(const muduo::net::TcpConnectionPtr &conn,
         for (auto &groupuser : groupusers)
         {
             int toid = groupuser.getId();
-            // 是否离线
-            bool isoff = false;
+            if (groupuser.getState() == "online")
             {
-                unique_lock<mutex> lock(mtx_);
-                auto it = userConnMap_.find(toid);
-                if (it != userConnMap_.end())
-                {
-                    it->second->send(js.dump());
-                }
-                else
-                {
-                    isoff = true;
-                }
+                redis_.publish(toid, js.dump());
             }
-            if (isoff)
+            else
             {
                 offlineMsgModel_.insert(toid, js.dump());
             }
@@ -483,13 +446,13 @@ void ChatService::refresh(const muduo::net::TcpConnectionPtr &conn,
     json response;
     response["msgid"] = REFRESH_MSG_ACK;
     // 当前用户信息
-    User user=userModel_.query(id);
-    if(user.getId()!=-1)
+    User user = userModel_.query(id);
+    if (user.getId() != -1)
     {
         json js;
-        js["username"]=user.getUsername();
-        js["state"]=user.getState();
-        response["user"]=js.dump();
+        js["username"] = user.getUsername();
+        js["state"] = user.getState();
+        response["user"] = js.dump();
     }
 
     // 已经添加的群组

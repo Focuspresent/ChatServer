@@ -17,4 +17,4 @@ target_include_directories(ChatServer PRIVATE ${PROJECT_SOURCE_DIR}/include/serv
 target_include_directories(ChatServer PRIVATE ${PROJECT_SOURCE_DIR}/include/server/model)
 
 # 链接库
-target_link_libraries(ChatServer muduo_net muduo_base pthread mysqlclient)
+target_link_libraries(ChatServer muduo_net muduo_base pthread mysqlclient hiredis)
