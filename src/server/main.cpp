@@ -16,8 +16,13 @@ void errsig_handler(int sig)
     exit(0);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    if (argc != 3)
+    {
+        fprintf(stdout, "Usage:%s ip port", argv[0]);
+        exit(-1);
+    }
     // 处理异常信号
     int signals[] = {SIGINT, SIGILL, SIGABRT, SIGBUS, SIGFPE, SIGKILL, SIGSEGV};
 
@@ -27,7 +32,7 @@ int main()
     }
 
     EventLoop loop;
-    InetAddress listenAddr("127.0.0.1", 9000);
+    InetAddress listenAddr(argv[1], atoi(argv[2]));
 
     ChatServer server(&loop, listenAddr, "ChatServer");
 
